@@ -159,7 +159,7 @@ td .tag{display:block;margin:0}
         <select id="interval"><option value="15">15 ثانية</option><option value="30">30 ثانية</option><option value="60">دقيقة</option><option value="300">5 دقائق</option></select>
       </label>
     </div>
-    <p class="note">أسعار الجنيه محسوبة من السعر العالمي × سعر الدولار × نقاوة العيار، والسبائك على نفس الأساس بدون علاوة الماركة. اكتب سعر 21 عند الصايغ واضغط معايرة، والفرق بيتطبق على كل الأصناف.</p>
+    <p class="note">أسعار الجنيه محسوبة من السعر العالمي × سعر الدولار × نقاوة العيار، وسبائك الفضة على نفس الأساس بدون علاوة الماركة أو المصنعية. اكتب سعر 21 عند الصايغ واضغط معايرة، والفرق بيتطبق على كل الأصناف.</p>
   </details>
 
   <footer>
@@ -251,13 +251,12 @@ function render(){
     gb += rowHtml('g24','عيار 24','للجرام', r&&g24*r*gp, g24, 2);
     gb += rowHtml('g21','عيار 21','للجرام', r&&g24*21/24*r*gp, g24*21/24, 2);
     gb += rowHtml('pound','الجنيه الذهب','8 جم عيار 21', r&&g24*21/24*8*r*gp, g24*21/24*8, 2);
-    gb += rowHtml('bar50','سبيكة 50 جم BTC','عيار 24', r&&g24*50*r*gp, g24*50, 0);
-    gb += rowHtml('bar1k','سبيكة كيلو','عيار 24', r&&g24*1000*r*gp, g24*1000, 0);
   }
   if(S.xag!=null){
     var s = S.xag/OZ*0.999;
     sb += rowHtml('s999','فضة 999','للجرام', r&&s*r*sp, s, 2);
-    sb += rowHtml('sbar1k','سبيكة فضة كيلو','999', r&&s*1000*r*sp, s*1000, 0);
+    sb += rowHtml('sbar50','سبيكة 50 جم BTC','فضة 999', r&&s*50*r*sp, s*50, 2);
+    sb += rowHtml('sbar1k','سبيكة كيلو','فضة 999', r&&s*1000*r*sp, s*1000, 0);
   }
   $('goldRows').innerHTML = gb || '<tr><td colspan="3">لا توجد بيانات</td></tr>';
   $('silverRows').innerHTML = sb || '<tr><td colspan="3">لا توجد بيانات</td></tr>';
@@ -343,10 +342,8 @@ $('copyBtn').addEventListener('click', function(){
     lines.push('عيار 24: ' + fmt(g24*r*gp) + ' جنيه');
     lines.push('عيار 21: ' + fmt(g24*21/24*r*gp) + ' جنيه');
     lines.push('الجنيه الذهب: ' + fmt(g24*21/24*8*r*gp) + ' جنيه');
-    lines.push('سبيكة 50 جم: ' + fmt(g24*50*r*gp, 0) + ' جنيه');
-    lines.push('سبيكة كيلو: ' + fmt(g24*1000*r*gp, 0) + ' جنيه');
   }
-  if(S.xag!=null && r){ lines.push('فضة 999: ' + fmt(S.xag/OZ*0.999*r*sp) + ' جنيه للجرام'); lines.push('سبيكة فضة كيلو: ' + fmt(S.xag/OZ*0.999*1000*r*sp, 0) + ' جنيه'); }
+  if(S.xag!=null && r){ lines.push('فضة 999: ' + fmt(S.xag/OZ*0.999*r*sp) + ' جنيه للجرام'); lines.push('سبيكة فضة 50 جم BTC: ' + fmt(S.xag/OZ*0.999*50*r*sp) + ' جنيه'); lines.push('سبيكة فضة كيلو: ' + fmt(S.xag/OZ*0.999*1000*r*sp, 0) + ' جنيه'); }
   var txt = lines.join('\n'), btn = $('copyBtn');
   function done(m){ btn.textContent = m; setTimeout(function(){ btn.textContent = 'نسخ الأسعار'; }, 1800); }
   function fallback(){
