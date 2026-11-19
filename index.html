@@ -104,7 +104,7 @@ footer{font-size:.78rem;color:var(--mute);display:grid;gap:4px}
       <span class="dot" id="dot"></span><span id="statusText">جاري التحميل…</span>
       <button id="refreshBtn" type="button">تحديث</button>
       <button id="copyBtn" type="button">نسخ الأسعار</button>
-      <button id="installBtn" type="button" class="primary" hidden>ثبّت التطبيق</button>
+      <button id="installBtn" type="button" class="primary">ثبّت التطبيق</button>
       <button id="themeBtn" type="button" aria-label="تغيير المظهر">فاتح / غامق</button>
     </div>
   </header>
@@ -616,17 +616,18 @@ var deferredPrompt = null;
 var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 function showInstall(){ if(!standalone) $('installBtn').hidden = false; }
+if(standalone) $('installBtn').hidden = true;
 window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferredPrompt = e; showInstall(); });
 window.addEventListener('appinstalled', function(){ deferredPrompt = null; $('installBtn').hidden = true; $('installHint').hidden = true; });
 if(isIOS) showInstall();
 $('installBtn').addEventListener('click', function(){
   if(deferredPrompt){
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(){ deferredPrompt = null; $('installBtn').hidden = true; }, function(){});
+    deferredPrompt.userChoice.then(function(c){ deferredPrompt = null; if(c && c.outcome==='accepted') $('installBtn').hidden = true; }, function(){});
     return;
   }
   var h = $('installHint');
-  h.textContent = isIOS ? 'على الآيفون: دوس زرار المشاركة في Safari ثم "إضافة إلى الشاشة الرئيسية".' : 'من قايمة المتصفح (⋮) اختار "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".';
+  h.textContent = isIOS ? 'على الآيفون: دوس زرار المشاركة في Safari ثم "إضافة إلى الشاشة الرئيسية".' : 'من قايمة Chrome (⋮ فوق على اليمين) اختار "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية". لو مش ظاهرة، افتح الرابط في Chrome مباشرة مش من داخل تطبيق تاني.';
   h.hidden = false;
 });
 if('serviceWorker' in navigator && /^https:|^http:\/\/localhost/.test(location.href)){
