@@ -98,6 +98,12 @@ td:first-child{white-space:normal;line-height:1.35}
 td .tag{display:block;margin:0}
 .num{font-size:.95rem}
 @media (max-width:400px){th,td{padding:8px 4px}.num{font-size:.88rem}}
+.top3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mini{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.mini .label{color:var(--mute);font-size:.78rem;line-height:1.3}
+.mini .val{font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;direction:ltr;text-align:right;border-radius:6px;margin-top:2px}
+.mini.g .val{color:var(--gold)} .mini.s .val{color:var(--silver)}
+@media (max-width:400px){.top3{gap:6px}.mini{padding:8px}.mini .val{font-size:1.05rem}}
 </style>
 </head>
 <body>
@@ -116,6 +122,12 @@ td .tag{display:block;margin:0}
   <div id="errBox" class="banner err" hidden></div>
   <div id="staleBox" class="banner warn" hidden></div>
   <div id="installHint" class="banner" hidden></div>
+
+  <section class="top3">
+    <div class="mini"><div class="label">الدولار بالجنيه</div><div class="val" id="vFx">—</div></div>
+    <div class="mini g"><div class="label">أونصة الذهب عالمياً ($)</div><div class="val" id="vXau">—</div></div>
+    <div class="mini s"><div class="label">أونصة الفضة عالمياً ($)</div><div class="val" id="vXag">—</div></div>
+  </section>
 
   <section class="panel">
     <h2>الذهب <span class="tag" id="fxTag"></span></h2>
@@ -242,6 +254,13 @@ function rowHtml(key, name, note, egp, usd, dec){
   return '<tr><td>'+name+(note?' <span class="tag">'+note+'</span>':'')+'</td><td class="num'+cls+'">'+e+'</td><td class="num">'+u+'</td></tr>';
 }
 
+function setMini(id, v){
+  var el = $(id), t = fmt(v), p = el.textContent;
+  if(p === t) return;
+  var pn = parseFloat(p.replace(/,/g,''));
+  el.textContent = t;
+  if(isFinite(pn) && v!=null){ el.classList.remove('flash-up','flash-down'); void el.offsetWidth; el.classList.add(v > pn ? 'flash-up' : 'flash-down'); }
+}
 function render(){
   var fx = effFx(), r = fx ? fx.rate : null;
   var gp = prem('gold'), sp = prem('silver');
@@ -258,6 +277,9 @@ function render(){
     sb += rowHtml('sbar50','سبيكة 50 جم BTC','فضة 999', r&&s*50*r*sp, s*50, 2);
     sb += rowHtml('sbar1k','سبيكة كيلو','فضة 999', r&&s*1000*r*sp, s*1000, 0);
   }
+  setMini('vFx', fx ? fx.rate : null);
+  setMini('vXau', S.xau);
+  setMini('vXag', S.xag);
   $('goldRows').innerHTML = gb || '<tr><td colspan="3">لا توجد بيانات</td></tr>';
   $('silverRows').innerHTML = sb || '<tr><td colspan="3">لا توجد بيانات</td></tr>';
   $('fxTag').textContent = fx ? '(دولار '+fmt(fx.rate)+' '+fx.label+(+cfg.goldPrem ? '، فرق '+cfg.goldPrem+'%' : '')+')' : '(سعر الدولار غير متاح)';
@@ -337,6 +359,9 @@ $('refreshBtn').addEventListener('click', refresh);
 $('copyBtn').addEventListener('click', function(){
   var fx = effFx(), r = fx ? fx.rate : null, gp = prem('gold'), sp = prem('silver');
   var lines = ['أسعار الذهب والفضة — ' + new Date().toLocaleString('ar-EG')];
+  if(r) lines.push('الدولار: ' + fmt(r) + ' جنيه');
+  if(S.xau!=null) lines.push('أونصة الذهب: ' + fmt(S.xau) + ' $');
+  if(S.xag!=null) lines.push('أونصة الفضة: ' + fmt(S.xag) + ' $');
   if(S.xau!=null && r){
     var g24 = S.xau/OZ;
     lines.push('عيار 24: ' + fmt(g24*r*gp) + ' جنيه');
