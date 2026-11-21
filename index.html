@@ -53,11 +53,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 
 /* top block */
 .top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.75fr);gap:10px}
-.stack{display:grid;gap:10px;grid-template-rows:1fr 1fr}
+.stack{display:grid;gap:8px;grid-template-rows:repeat(3,1fr)}
+.stack .card{padding:8px 12px}
+.sm.silver .v{color:var(--silver)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
 .card .t{font-weight:600;font-size:1rem}
 .sm{display:grid;gap:2px;align-content:center}
-.sm .v{font-size:1.7rem;font-weight:700;direction:ltr;text-align:right;line-height:1.2;font-variant-numeric:tabular-nums}
+.sm .v{font-size:1.45rem;font-weight:700;direction:ltr;text-align:right;line-height:1.2;font-variant-numeric:tabular-nums}
 .sm .u{font-size:.74rem;color:var(--gold);display:flex;justify-content:space-between;gap:6px}
 .sm .u span:first-child{color:var(--gold)}
 .big{border:1.5px solid var(--gold);display:grid;gap:2px;grid-template-rows:auto 1fr auto;padding:12px 14px}
@@ -130,7 +132,7 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
 @media (max-width:400px){
   h1{font-size:1.8rem}
   .big .bv{font-size:3rem}
-  .sm .v{font-size:1.45rem}
+  .sm .v{font-size:1.3rem}
   .card,.panel{padding:10px 11px}
   .cur .x{font-size:.82rem}
   .rate .v{font-size:1.25rem}
@@ -159,7 +161,8 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
 
   <section class="top">
     <div class="stack">
-      <div class="card sm"><div class="t">الأونصة</div><div class="v" id="vXau">—</div><div class="u"><span>دولار / أونصة</span></div></div>
+      <div class="card sm"><div class="t">أونصة الذهب</div><div class="v" id="vXau">—</div><div class="u"><span>دولار / أونصة</span></div></div>
+      <div class="card sm silver"><div class="t">أونصة الفضة</div><div class="v" id="vXag">—</div><div class="u"><span>دولار / أونصة</span></div></div>
       <div class="card sm"><div class="t">عيار <span class="n" data-n="24">24</span></div><div class="v" id="v24">—</div><div class="u"><span>جنيه / جرام</span></div></div>
     </div>
     <div class="card big">
@@ -205,7 +208,6 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
 
   <section class="panel">
     <h2>الفضة</h2>
-    <div class="oz"><span>أونصة الفضة عالمياً</span><b id="vXag">—</b></div>
     <div class="tablebox"><table>
       <thead><tr><th>الصنف</th><th>بالجنيه</th><th>بالدولار</th></tr></thead>
       <tbody id="silverRows"></tbody>
@@ -238,7 +240,7 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
         <select id="interval"><option value="15">15 ثانية</option><option value="30">30 ثانية</option><option value="60">دقيقة</option><option value="300">5 دقائق</option></select>
       </label>
       <label>شكل الأرقام
-        <select id="digits"><option value="ar">عربي (٠١٢٣)</option><option value="en">إنجليزي (0123)</option></select>
+        <select id="digits"><option value="en">إنجليزي (0123)</option><option value="ar">عربي (٠١٢٣)</option></select>
       </label>
     </div>
     <p class="note">أسعار الجنيه محسوبة من السعر العالمي × سعر الدولار × نقاوة العيار. دولار الصاغة هو سعر الدولار بعد تطبيق الفرق اللي ضبطته من سعر الصايغ، وسبائك الفضة على نفس الأساس بدون علاوة الماركة أو المصنعية. حركة السعر بتتسجل على جهازك طول ما الصفحة مفتوحة.</p>
@@ -259,7 +261,8 @@ var $ = function(id){return document.getElementById(id)};
 function load(key, def){ try{ var v = localStorage.getItem(key); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
 function save(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
 
-var cfg = Object.assign({fxMode:'auto', fxManual:'', goldPrem:0, silverPrem:0, interval:30, theme:null, digits:'ar', range:25}, load('gold-cfg', {}));
+var cfg = Object.assign({fxMode:'auto', fxManual:'', goldPrem:0, silverPrem:0, interval:30, theme:null, digits:'en', range:25}, load('gold-cfg', {}));
+if(cfg.digitsV !== 2){ cfg.digits = 'en'; cfg.digitsV = 2; try{ localStorage.setItem('gold-cfg', JSON.stringify(cfg)); }catch(e){} }
 var last = load('gold-last', null);
 var hist = load('gold-hist2', []);
 var S = {xau:null, xag:null, fx:null, rates:null, srcMetal:'', srcFx:'', metalTs:null, timer:null, busy:false, fromCache:false};
@@ -402,7 +405,7 @@ function renderChart(){
   var pct = (pts[pts.length-1].v / pts[0].v - 1) * 100;
   badge.hidden = false;
   badge.className = 'badge ' + (Math.abs(pct) < 0.005 ? 'flat' : pct > 0 ? 'up' : 'down');
-  badge.textContent = (Math.abs(pct) < 0.005 ? '' : pct > 0 ? '▲ ' : '▼ ') + ar(num(Math.abs(pct), 2)) + '٪';
+  badge.textContent = (Math.abs(pct) < 0.005 ? '' : pct > 0 ? '▲ ' : '▼ ') + ar(num(Math.abs(pct), 2)) + (cfg.digits==='en' ? '%' : '٪');
 }
 Array.prototype.forEach.call($('chips').children, function(b){
   b.addEventListener('click', function(){ cfg.range = +b.getAttribute('data-r'); save('gold-cfg', cfg); renderChart(); });
