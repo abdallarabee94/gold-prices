@@ -80,7 +80,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .chead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
 .chead b{font-size:1.05rem}
 .chips{display:flex;gap:6px}
-.chips button{padding:2px 10px;font-size:.76rem;color:var(--mute)}
+.chead{flex-wrap:wrap}
+.chips{width:100%;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start}
+.chips button{white-space:nowrap;flex:none}
+.chips button{padding:2px 8px;font-size:.74rem;color:var(--mute)}
 .chips button.on{color:var(--gold);border-color:var(--gold)}
 .chartbox{position:relative;height:170px;direction:ltr}
 .plot{position:absolute;left:0;right:50px;top:0;bottom:0}
@@ -175,9 +178,11 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
     <div class="chead">
       <b>حركة سعر الفضة <span style="color:var(--gold)">↗</span></b>
       <div class="chips" id="chips">
+        <button type="button" data-r="1">1 د</button>
+        <button type="button" data-r="5">5 د</button>
         <button type="button" data-r="25">25 د</button>
         <button type="button" data-r="60">ساعة</button>
-        <button type="button" data-r="360">6 ساعات</button>
+        <button type="button" data-r="360">6 س</button>
       </div>
     </div>
     <div class="chartbox"><div class="plot" id="plot"></div><div class="ylab" id="ylab"></div></div>
@@ -248,7 +253,7 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
         <select id="digits"><option value="en">إنجليزي (0123)</option><option value="ar">عربي (٠١٢٣)</option></select>
       </label>
     </div>
-    <p class="note">أسعار الجنيه محسوبة من السعر العالمي × سعر الدولار × نقاوة العيار. دولار الصاغة هو سعر الدولار بعد تطبيق الفرق اللي ضبطته من سعر الصايغ، وسبائك الفضة على نفس الأساس بدون علاوة الماركة أو المصنعية. حركة السعر بتتسجل على جهازك طول ما الصفحة مفتوحة.</p>
+    <p class="note">أسعار الجنيه محسوبة من السعر العالمي × سعر الدولار × نقاوة العيار. دولار الصاغة هو سعر الدولار بعد تطبيق الفرق اللي ضبطته من سعر الصايغ، وسبائك الفضة على نفس الأساس بدون علاوة الماركة أو المصنعية. سعر الفضة وحركته بيتحدثوا كل ثانية طول ما الصفحة مفتوحة، وبيتسجلوا على جهازك. لو مصدر الأسعار حدّث بطيء أو رفض الطلبات الكتيرة، التحديث بيهدّى لوحده.</p>
   </details>
 
   <footer>
@@ -267,6 +272,7 @@ function load(key, def){ try{ var v = localStorage.getItem(key); return v ? JSON
 function save(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
 
 var cfg = Object.assign({fxMode:'auto', fxManual:'', goldPrem:0, silverPrem:0, interval:30, theme:null, digits:'en', range:25}, load('gold-cfg', {}));
+if(cfg.rangeV !== 2){ cfg.range = 5; cfg.rangeV = 2; }
 if(cfg.digitsV !== 2){ cfg.digits = 'en'; cfg.digitsV = 2; try{ localStorage.setItem('gold-cfg', JSON.stringify(cfg)); }catch(e){} }
 var last = load('gold-last', null);
 var hist = load('gold-hist2', []);
@@ -301,7 +307,7 @@ var LOG = [];
 function fj(url, ms){
   var t, host = url.split('/')[2];
   var timeout = new Promise(function(_, rej){ t = setTimeout(function(){ var e = new Error('timeout'); e.name = 'AbortError'; rej(e); }, ms||8000); });
-  function note(e){ var m = (e && e.name==='AbortError') ? 'انتهت المهلة' : (e && e.message) || 'خطأ'; if(m==='Failed to fetch'||m==='Load failed'||m==='NetworkError when attempting to fetch resource.') m = 'تم حجب الطلب (شبكة أو CORS أو بيئة العرض)'; LOG.push(host + ': ' + m); }
+  function note(e){ var m = (e && e.name==='AbortError') ? 'انتهت المهلة' : (e && e.message) || 'خطأ'; if(m==='Failed to fetch'||m==='Load failed'||m==='NetworkError when attempting to fetch resource.') m = 'تم حجب الطلب (شبكة أو CORS أو بيئة العرض)'; LOG.push(host + ': ' + m); if(LOG.length > 40) LOG.shift(); }
   var req = fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
   return Promise.race([req, timeout]).then(function(v){ clearTimeout(t); return v; }).catch(function(e){ clearTimeout(t); note(e); throw e; });
 }
@@ -353,6 +359,14 @@ function mainOf(h){
   var r = manualOn() ? +cfg.fxManual : h.fx;
   return (h.xag && r) ? h.xag/OZ*0.999*r*prem('silver') : null;
 }
+var sec = [];
+function pushSec(){
+  if(S.xag==null || S.fx==null) return;
+  var now = Date.now();
+  sec.push({t:now, xag:S.xag, fx:S.fx});
+  var cut = now - 30*60000;
+  while(sec.length && sec[0].t < cut) sec.shift();
+}
 function pushHist(){
   if(S.xau==null || S.xag==null || S.fx==null) return;
   var now = Date.now(), l = hist[hist.length-1];
@@ -367,12 +381,20 @@ function niceStep(raw){
   var p = Math.pow(10, Math.floor(Math.log(raw)/Math.LN10)), f = raw/p;
   return (f<=1 ? 1 : f<=2 ? 2 : f<=5 ? 5 : 10) * p;
 }
-function hhmm(t){ return ar(new Date(t).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})); }
+function hhmm(t, withSec){
+  var o = {hour:'2-digit', minute:'2-digit'}; if(withSec) o.second = '2-digit';
+  return ar(new Date(t).toLocaleTimeString('en-GB', o));
+}
 
 function renderChart(){
   var mins = +cfg.range || 25, from = Date.now() - mins*60000;
   Array.prototype.forEach.call($('chips').children, function(b){ b.classList.toggle('on', +b.getAttribute('data-r') === mins); });
-  var pts = hist.filter(function(h){ return h.t >= from; }).map(function(h){ return {t:h.t, v:mainOf(h)}; }).filter(function(p){ return p.v!=null; });
+  var src = hist;
+  if(mins <= 25 && sec.length){
+    var first = sec[0].t;
+    src = hist.filter(function(h){ return h.t < first; }).concat(sec);
+  }
+  var pts = src.filter(function(h){ return h.t >= from; }).map(function(h){ return {t:h.t, v:mainOf(h)}; }).filter(function(p){ return p.v!=null; });
   var badge = $('badge');
   if(pts.length < 2){
     $('plot').innerHTML = '<div class="empty">الرسم يبدأ بعد أول تحديثين،<br>سيب الصفحة مفتوحة شوية</div>';
@@ -390,7 +412,7 @@ function renderChart(){
   var d = view.map(function(p,i){ return (i?'L':'M') + ((p.t - t0)/dt*1000).toFixed(1) + ' ' + Y(p.v).toFixed(2); }).join(' ');
   var net = view[view.length-1].v - view[0].v;
   var col = net >= 0 ? 'var(--up)' : 'var(--down)';
-  var grid = '', labs = '', dec = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  var grid = '', labs = '', dec = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
   for(var v = lo; v <= hi + step/1000; v += step){
     var y = Y(v);
     grid += '<line x1="0" x2="1000" y1="'+y.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>';
@@ -404,7 +426,7 @@ function renderChart(){
     '<span class="pd" style="left:100%;top:'+endY.toFixed(2)+'%;background:'+col+';color:'+col+'"></span>';
   $('ylab').innerHTML = labs;
   var xl = '';
-  for(var i = 0; i < 4; i++) xl += '<span>' + (i === 3 ? 'الآن' : hhmm(t0 + dt*i/3)) + '</span>';
+  for(var i = 0; i < 4; i++) xl += '<span>' + (i === 3 ? 'الآن' : hhmm(t0 + dt*i/3, mins <= 5)) + '</span>';
   $('xlab').innerHTML = xl;
 
   var pct = (pts[pts.length-1].v / pts[0].v - 1) * 100;
@@ -510,6 +532,21 @@ function refresh(){
     render();
   });
 }
+/* per-second silver ticker: one small request, backs off on failure */
+var tickBusy = false, tickFail = 0;
+function tick(){
+  if(document.hidden || tickBusy || S.busy || S.fx==null) return Promise.resolve();
+  tickBusy = true;
+  return fj('https://api.gold-api.com/price/XAG', 4000).then(function(j){
+    S.xag = pos(j.price); tickFail = 0;
+    if(j.updatedAt){ S.metalTs = j.updatedAt; }
+    pushSec(); pushHist(); render();
+    setStatus('ok', 'لحظي ' + new Date().toLocaleTimeString('en-GB'));
+  }).catch(function(){ tickFail++; }).then(function(){ tickBusy = false; });
+}
+function loopTick(){
+  tick().then(function(){ setTimeout(loopTick, tickFail < 3 ? 1000 : tickFail < 6 ? 5000 : 30000); });
+}
 function schedule(){
   if(S.timer) clearInterval(S.timer);
   S.timer = setInterval(function(){ if(!document.hidden) refresh(); }, (+cfg.interval||30)*1000);
@@ -601,6 +638,7 @@ render();
 if(S.fromCache) setStatus('stale', 'عرض آخر أسعار محفوظة، جاري التحديث…');
 refresh();
 schedule();
+setTimeout(loopTick, 1500);
 })();
 </script>
 </body>
