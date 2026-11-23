@@ -91,6 +91,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .plot .pd{position:absolute;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px currentColor}
 .plot .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);font-size:.85rem;text-align:center;direction:rtl}
 .ylab{position:absolute;right:0;top:0;bottom:0;width:48px}
+.ylab span.lastp{color:#0a0f1c;font-weight:700;padding:1px 4px;border-radius:4px;z-index:2}
 .ylab span{position:absolute;right:0;transform:translateY(-50%);font-size:.72rem;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
 .xlab{display:flex;justify-content:space-between;direction:ltr;margin-top:8px;padding-right:50px;font-size:.74rem;color:var(--mute);font-variant-numeric:tabular-nums}
 
@@ -176,13 +177,15 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
 
   <section class="panel">
     <div class="chead">
-      <b>حركة سعر أونصة الفضة <span style="color:var(--gold)">↗</span></b>
+      <b>شموع أونصة الفضة <span style="color:var(--gold)">↗</span></b>
       <div class="chips" id="chips">
-        <button type="button" data-r="1">1 د</button>
-        <button type="button" data-r="5">5 د</button>
-        <button type="button" data-r="25">25 د</button>
-        <button type="button" data-r="60">ساعة</button>
-        <button type="button" data-r="360">6 س</button>
+        <button type="button" data-f="5">5 ث</button>
+        <button type="button" data-f="10">10 ث</button>
+        <button type="button" data-f="15">15 ث</button>
+        <button type="button" data-f="30">30 ث</button>
+        <button type="button" data-f="60">1 د</button>
+        <button type="button" data-f="300">5 د</button>
+        <button type="button" data-f="900">15 د</button>
       </div>
     </div>
     <div class="chartbox"><div class="plot" id="plot"></div><div class="ylab" id="ylab"></div></div>
@@ -272,7 +275,7 @@ function load(key, def){ try{ var v = localStorage.getItem(key); return v ? JSON
 function save(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
 
 var cfg = Object.assign({fxMode:'auto', fxManual:'', goldPrem:0, silverPrem:0, interval:30, theme:null, digits:'en', range:25}, load('gold-cfg', {}));
-if(cfg.rangeV !== 2){ cfg.range = 5; cfg.rangeV = 2; }
+if(cfg.frameV !== 1){ cfg.frame = 5; cfg.frameV = 1; }
 if(cfg.digitsV !== 2){ cfg.digits = 'en'; cfg.digitsV = 2; try{ localStorage.setItem('gold-cfg', JSON.stringify(cfg)); }catch(e){} }
 var last = load('gold-last', null);
 var hist = load('gold-hist2', []);
@@ -354,25 +357,30 @@ function rowHtml(key, name, note, vEgp, vUsd, dec){
   return '<tr><td>'+name+(note?'<span class="tag">'+note+'</span>':'')+'</td><td class="num'+cls+'">'+e+'</td><td class="num">'+usd(vUsd, dec)+'</td></tr>';
 }
 
-/* ---------- history + chart ---------- */
-function mainOf(h){ return h.xag > 0 ? h.xag : null; }  // global silver ounce in USD
-var sec = [];
-function pushSec(){
-  if(S.xag==null) return;
-  var now = Date.now();
-  sec.push({t:now, xag:S.xag, fx:S.fx});
-  var cut = now - 30*60000;
-  while(sec.length && sec[0].t < cut) sec.shift();
+/* ---------- candles ---------- */
+var BASE = 5000;  // base candle = 5 seconds; every timeframe is a multiple of it
+var c5 = load('gold-c5', []);
+function addTick(t, p){
+  if(!(p > 0)) return;
+  var bk = Math.floor(t/BASE)*BASE, l = c5[c5.length-1];
+  if(l && l.t === bk){ if(p > l.h) l.h = p; if(p < l.l) l.l = p; l.c = p; }
+  else if(!l || bk > l.t){ c5.push({t:bk, o:p, h:p, l:p, c:p}); }
+  var cut = t - 12*3600e3;
+  while(c5.length && c5[0].t < cut) c5.shift();
 }
-function pushHist(){
-  if(S.xau==null || S.xag==null || S.fx==null) return;
-  var now = Date.now(), l = hist[hist.length-1];
-  if(l && now - l.t < 10000) return;
-  hist.push({t:now, xau:S.xau, xag:S.xag, fx:S.fx});
-  var cut = now - 24*3600e3;
-  while(hist.length && hist[0].t < cut) hist.shift();
-  if(hist.length > 2500) hist = hist.slice(-2500);
-  save('gold-hist2', hist);
+var lastSave = 0;
+function saveC5(force){ var n = Date.now(); if(!force && n - lastSave < 20000) return; lastSave = n; save('gold-c5', c5); }
+if(!c5.length){ hist.forEach(function(h){ if(h.xag > 0) addTick(h.t, h.xag); }); }  // seed from older readings
+window.addEventListener('pagehide', function(){ saveC5(true); });
+
+function aggregate(sec){
+  var ms = sec*1000, out = [], cur = null;
+  c5.forEach(function(c){
+    var bk = Math.floor(c.t/ms)*ms;
+    if(cur && cur.t === bk){ if(c.h > cur.h) cur.h = c.h; if(c.l < cur.l) cur.l = c.l; cur.c = c.c; }
+    else { cur = {t:bk, o:c.o, h:c.h, l:c.l, c:c.c}; out.push(cur); }
+  });
+  return out;
 }
 function niceStep(raw){
   var p = Math.pow(10, Math.floor(Math.log(raw)/Math.LN10)), f = raw/p;
@@ -384,56 +392,56 @@ function hhmm(t, withSec){
 }
 
 function renderChart(){
-  var mins = +cfg.range || 25, from = Date.now() - mins*60000;
-  Array.prototype.forEach.call($('chips').children, function(b){ b.classList.toggle('on', +b.getAttribute('data-r') === mins); });
-  var src = hist;
-  if(mins <= 25 && sec.length){
-    var first = sec[0].t;
-    src = hist.filter(function(h){ return h.t < first; }).concat(sec);
-  }
-  var pts = src.filter(function(h){ return h.t >= from; }).map(function(h){ return {t:h.t, v:mainOf(h)}; }).filter(function(p){ return p.v!=null; });
-  var badge = $('badge');
-  if(pts.length < 2){
-    $('plot').innerHTML = '<div class="empty">الرسم يبدأ بعد أول تحديثين،<br>سيب الصفحة مفتوحة شوية</div>';
+  var fr = +cfg.frame || 5;
+  Array.prototype.forEach.call($('chips').children, function(b){ b.classList.toggle('on', +b.getAttribute('data-f') === fr); });
+  var w = $('plot').clientWidth || 300;
+  var n = Math.max(20, Math.min(120, Math.floor(w/7)));
+  var cs = aggregate(fr).slice(-n), badge = $('badge');
+  if(cs.length < 2){
+    $('plot').innerHTML = '<div class="empty">الشموع بتبدأ بعد أول تحديثين،<br>سيب الصفحة مفتوحة شوية</div>';
     $('ylab').innerHTML = ''; $('xlab').innerHTML = ''; badge.hidden = true; return;
   }
-  var step0 = Math.ceil(pts.length/300), view = pts.filter(function(p,i){ return i % step0 === 0 || i === pts.length-1; });
   var mn = Infinity, mx = -Infinity;
-  view.forEach(function(p){ if(p.v<mn) mn=p.v; if(p.v>mx) mx=p.v; });
-  var span = (mx - mn) || Math.max(1, mx*0.001);
+  cs.forEach(function(c){ if(c.l < mn) mn = c.l; if(c.h > mx) mx = c.h; });
+  var span = (mx - mn) || Math.max(0.01, mx*0.0005);
   var step = niceStep(span/4);
   var lo = Math.floor(mn/step)*step, hi = Math.ceil(mx/step)*step;
   if(hi - lo < step*2){ hi = lo + step*2; }
-  var t0 = view[0].t, t1 = view[view.length-1].t, dt = (t1 - t0) || 1;
   function Y(v){ return (hi - v)/(hi - lo)*100; }
-  var d = view.map(function(p,i){ return (i?'L':'M') + ((p.t - t0)/dt*1000).toFixed(1) + ' ' + Y(p.v).toFixed(2); }).join(' ');
-  var net = view[view.length-1].v - view[0].v;
-  var col = net >= 0 ? 'var(--up)' : 'var(--down)';
-  var grid = '', labs = '', dec = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  var dec = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  var grid = '', labs = '';
   for(var v = lo; v <= hi + step/1000; v += step){
     var y = Y(v);
-    grid += '<line x1="0" x2="1000" y1="'+y.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>';
+    grid += '<line x1="0" x2="'+(n*10)+'" y1="'+y.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>';
     labs += '<span style="top:'+y.toFixed(2)+'%">'+usd(v, dec)+'</span>';
   }
-  var endY = Y(view[view.length-1].v);
-  $('plot').innerHTML = '<svg viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="حركة سعر أونصة الفضة بالدولار">' +
-    '<defs><linearGradient id="gfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:'+col+';stop-opacity:.28"/><stop offset="1" style="stop-color:'+col+';stop-opacity:0"/></linearGradient></defs>' +
-    grid + '<path d="'+d+' L1000 100 L0 100 Z" fill="url(#gfill)"/>' +
-    '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>' +
-    '<span class="pd" style="left:100%;top:'+endY.toFixed(2)+'%;background:'+col+';color:'+col+'"></span>';
-  $('ylab').innerHTML = labs;
+  var off = n - cs.length, body = '';
+  cs.forEach(function(c, i){
+    var cx = (off + i)*10 + 5, col = c.c >= c.o ? 'var(--up)' : 'var(--down)';
+    var yo = Y(c.o), yc = Y(c.c), top = Math.min(yo, yc), h = Math.max(Math.abs(yo - yc), 0.7);
+    body += '<line x1="'+cx+'" x2="'+cx+'" y1="'+Y(c.h).toFixed(2)+'" y2="'+Y(c.l).toFixed(2)+'" stroke="'+col+'" stroke-width="1.3" vector-effect="non-scaling-stroke"/>' +
+            '<rect x="'+(cx-3.2)+'" y="'+top.toFixed(2)+'" width="6.4" height="'+h.toFixed(2)+'" fill="'+col+'"/>';
+  });
+  var lastC = cs[cs.length-1], ly = Y(lastC.c), lcol = lastC.c >= lastC.o ? 'var(--up)' : 'var(--down)';
+  body += '<line x1="0" x2="'+(n*10)+'" y1="'+ly.toFixed(2)+'" y2="'+ly.toFixed(2)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>';
+  $('plot').innerHTML = '<svg viewBox="0 0 '+(n*10)+' 100" preserveAspectRatio="none" role="img" aria-label="شموع سعر أونصة الفضة">' + grid + body + '</svg>';
+  $('ylab').innerHTML = labs + '<span class="lastp" style="top:'+ly.toFixed(2)+'%;background:'+lcol+'">'+usd(lastC.c, Math.max(dec, 2))+'</span>';
   var xl = '';
-  for(var i = 0; i < 4; i++) xl += '<span>' + (i === 3 ? 'الآن' : hhmm(t0 + dt*i/3, mins <= 5)) + '</span>';
+  for(var i = 0; i < 4; i++){
+    var slot = Math.round(i*(n-1)/3);
+    xl += '<span>' + (i === 3 ? 'الآن' : hhmm(lastC.t - (n-1-slot)*fr*1000, fr < 60)) + '</span>';
+  }
   $('xlab').innerHTML = xl;
 
-  var pct = (pts[pts.length-1].v / pts[0].v - 1) * 100;
+  var pct = (lastC.c / cs[0].o - 1) * 100;
   badge.hidden = false;
   badge.className = 'badge ' + (Math.abs(pct) < 0.005 ? 'flat' : pct > 0 ? 'up' : 'down');
   badge.textContent = (Math.abs(pct) < 0.005 ? '' : pct > 0 ? '▲ ' : '▼ ') + ar(num(Math.abs(pct), 2)) + (cfg.digits==='en' ? '%' : '٪');
 }
 Array.prototype.forEach.call($('chips').children, function(b){
-  b.addEventListener('click', function(){ cfg.range = +b.getAttribute('data-r'); save('gold-cfg', cfg); renderChart(); });
+  b.addEventListener('click', function(){ cfg.frame = +b.getAttribute('data-f'); save('gold-cfg', cfg); renderChart(); });
 });
+window.addEventListener('resize', function(){ renderChart(); });
 
 /* ---------- render ---------- */
 var CURS = [['USD','cUSD'],['EUR','cEUR'],['SAR','cSAR'],['AED','cAED'],['KWD','cKWD']];
@@ -520,7 +528,7 @@ function refresh(){
 
     if(!errs.length){
       save('gold-last', {xau:S.xau, xag:S.xag, fx:S.fx, rates:S.rates, srcMetal:S.srcMetal, srcFx:S.srcFx, metalTs:S.metalTs});
-      pushHist();
+      addTick(Date.now(), S.xag); saveC5();
     }
     var tm = new Date().toLocaleTimeString('en-GB');
     if(errs.length) setStatus('err', 'فشل التحديث ' + tm);
@@ -537,7 +545,7 @@ function tick(){
   return fj('https://api.gold-api.com/price/XAG', 4000).then(function(j){
     S.xag = pos(j.price); tickFail = 0;
     if(j.updatedAt){ S.metalTs = j.updatedAt; }
-    pushSec(); pushHist(); render();
+    addTick(Date.now(), S.xag); saveC5(); render();
     setStatus('ok', 'لحظي ' + new Date().toLocaleTimeString('en-GB'));
   }).catch(function(){ tickFail++; }).then(function(){ tickBusy = false; });
 }
