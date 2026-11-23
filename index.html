@@ -168,15 +168,15 @@ footer{font-size:.76rem;color:var(--mute);display:grid;gap:3px;text-align:center
       <div class="card sm"><div class="t">ذهب عيار <span class="n" data-n="24">24</span></div><div class="v" id="v24">—</div><div class="u"><span>جنيه / جرام</span></div></div>
     </div>
     <div class="card big">
-      <div class="bt"><span class="t">فضة <span class="n" data-n="999">999</span></span><span class="badge flat" id="badge" hidden></span></div>
+      <div class="bt"><span class="t">أونصة الفضة</span><span class="badge flat" id="badge" hidden></span></div>
       <div class="bv" id="vS">—</div>
-      <div class="bb"><span id="poundLine">أونصة الفضة: —</span><span class="u">جنيه / جرام</span></div>
+      <div class="bb"><span id="poundLine">فضة 999 للجرام: —</span><span class="u">دولار / أونصة</span></div>
     </div>
   </section>
 
   <section class="panel">
     <div class="chead">
-      <b>حركة سعر الفضة <span style="color:var(--gold)">↗</span></b>
+      <b>حركة سعر أونصة الفضة <span style="color:var(--gold)">↗</span></b>
       <div class="chips" id="chips">
         <button type="button" data-r="1">1 د</button>
         <button type="button" data-r="5">5 د</button>
@@ -355,13 +355,10 @@ function rowHtml(key, name, note, vEgp, vUsd, dec){
 }
 
 /* ---------- history + chart ---------- */
-function mainOf(h){
-  var r = manualOn() ? +cfg.fxManual : h.fx;
-  return (h.xag && r) ? h.xag/OZ*0.999*r*prem('silver') : null;
-}
+function mainOf(h){ return h.xag > 0 ? h.xag : null; }  // global silver ounce in USD
 var sec = [];
 function pushSec(){
-  if(S.xag==null || S.fx==null) return;
+  if(S.xag==null) return;
   var now = Date.now();
   sec.push({t:now, xag:S.xag, fx:S.fx});
   var cut = now - 30*60000;
@@ -416,10 +413,10 @@ function renderChart(){
   for(var v = lo; v <= hi + step/1000; v += step){
     var y = Y(v);
     grid += '<line x1="0" x2="1000" y1="'+y.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>';
-    labs += '<span style="top:'+y.toFixed(2)+'%">'+egp(v, dec)+'</span>';
+    labs += '<span style="top:'+y.toFixed(2)+'%">'+usd(v, dec)+'</span>';
   }
   var endY = Y(view[view.length-1].v);
-  $('plot').innerHTML = '<svg viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="حركة سعر الفضة 999">' +
+  $('plot').innerHTML = '<svg viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="حركة سعر أونصة الفضة بالدولار">' +
     '<defs><linearGradient id="gfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:'+col+';stop-opacity:.28"/><stop offset="1" style="stop-color:'+col+';stop-opacity:0"/></linearGradient></defs>' +
     grid + '<path d="'+d+' L1000 100 L0 100 Z" fill="url(#gfill)"/>' +
     '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>' +
@@ -450,8 +447,8 @@ function render(){
   var v21 = g24!=null && r ? g24*21/24*r*gp : null;
   setV('v21', v21!=null ? egp(v21, 0) : '—', v21);
   var sPer = (S.xag!=null && r) ? S.xag/OZ*0.999*r*sp : null;
-  setV('vS', sPer!=null ? egp(sPer, 2) : '—', sPer);
-  $('poundLine').textContent = 'أونصة الفضة: ' + (S.xag!=null ? usd(S.xag, 2) + ' $' : '—');
+  setV('vS', S.xag!=null ? usd(S.xag, 2) : '—', S.xag);
+  $('poundLine').textContent = 'فضة 999 للجرام: ' + (sPer!=null ? egp(sPer, 2) + ' جنيه' : '—');
   Array.prototype.forEach.call(document.querySelectorAll('[data-n]'), function(n){ n.textContent = ar(n.getAttribute('data-n')); });
 
   setV('dBank', r ? egp(r, 2) : '—', r);
@@ -535,7 +532,7 @@ function refresh(){
 /* per-second silver ticker: one small request, backs off on failure */
 var tickBusy = false, tickFail = 0;
 function tick(){
-  if(document.hidden || tickBusy || S.busy || S.fx==null) return Promise.resolve();
+  if(document.hidden || tickBusy || S.busy) return Promise.resolve();
   tickBusy = true;
   return fj('https://api.gold-api.com/price/XAG', 4000).then(function(j){
     S.xag = pos(j.price); tickFail = 0;
